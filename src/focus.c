@@ -288,26 +288,27 @@ clientSelectMask (Client * c, Client *other, guint mask, guint type)
     }
     if ((mask & SEARCH_THIS_MONITOR))
     {
-        int i;
-        int monitor_count;
-        XRRMonitorInfo *monitors;
+	int i;
+	int monitor_count = 0;
+	XRRMonitorInfo *monitors;
 
-        monitors = XRRGetMonitors(clientGetXDisplay(c), c->window, True, &monitor_count);
+	monitors = XRRGetMonitors (clientGetXDisplay(c), c->window, True, &monitor_count);
+	if (monitors != NULL) {
+	    for (i = 0; i < monitor_count; i++)
+	    {
+		if (cursorInMonitor (&monitors[i], c->screen_info) && clientInMonitor(&monitors[i], c))
+		{
+		    break;
+		}
+	    }
 
-        for (i = 0; i < monitor_count; i++)
-        {
-            if (cursorInMonitor(monitors + i, c->screen_info) && clientInMonitor(monitors + i, c))
-            {
-                break;
-            }
-        }
+	    XRRFreeMonitors (monitors);
 
-        if (i == monitor_count)
-        {
-            return FALSE;
-        }
-
-        XRRFreeMonitors(monitors);
+	    if (i == monitor_count)
+	    {
+		return FALSE;
+	    }
+	}
     }
     if (c->type & type)
     {
