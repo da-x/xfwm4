@@ -94,6 +94,9 @@ xfwm4_CFLAGS =								\
 	-DG_LOG_DOMAIN=\"xfwm4\"
 
 xfwm4_LDADD =								\
+        $(top_builddir)/WINGs/libWINGs.la                               \
+        $(top_builddir)/WINGs/libWUtil.la                               \
+        $(top_builddir)/wrlib/libwraster.la                             \
 	$(top_builddir)/common/libxfwm-common.la 			\
 	$(GLIB_LIBS) 							\
 	$(GTK_LIBS) 							\
@@ -110,10 +113,13 @@ xfwm4_LDADD =								\
 	$(RANDR_LIBS) 							\
 	$(RENDER_LIBS)							\
 	$(XINERAMA_LIBS)						\
-	$(MATH_LIBS)
+	$(MATH_LIBS)                                                    \
+        -lXmu
 
 AM_CPPFLAGS = 								\
 	-I${top_srcdir} 						\
+	-I$(top_srcdir)/wrlib                                           \
+	-I$(top_srcdir)/WINGs @HEADER_SEARCH_PATH@                      \
 	$(PLATFORM_CPPFLAGS)
 
 EXTRA_DIST = 								\

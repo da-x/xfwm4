@@ -31,6 +31,8 @@
 #include <glib.h>
 #include <xfconf/xfconf.h>
 #include <libxfce4kbd-private/xfce-shortcuts-provider.h>
+#include <wrlib/wraster.h>
+#include <WINGs/WINGs.h>
 
 #ifdef HAVE_LIBSTARTUP_NOTIFICATION
 #define SN_API_NOT_YET_FROZEN
@@ -86,6 +88,13 @@ typedef enum
     VBLANK_GLX,
     VBLANK_ERROR,
 } vblankMode;
+
+typedef struct WorkspaceNameData {
+    int count;
+    RImage *back;
+    RImage *text;
+    time_t timeout;
+} WorkspaceNameData;
 
 struct _ScreenInfo
 {
@@ -150,6 +159,11 @@ struct _ScreenInfo
     gchar **workspace_names;
     int workspace_names_items;
     NetWmDesktopLayout desktop_layout;
+    struct WorkspaceNameData *workspace_name_data;
+    WMFont *workspace_name_font;
+    WMScreen *workspace_name_screen;
+    Window workspace_name;
+    bool workspace_timer;
 
     /* Button handler for GTK */
     gulong button_handler_id;

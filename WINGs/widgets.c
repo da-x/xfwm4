@@ -910,6 +910,31 @@ WMScreen *WMCreateScreenWithRContext(Display * display, int screen, RContext * c
 	return scrPtr;
 }
 
+WMScreen *WMCreateFontScreen(Display *display)
+{
+        WMScreen *scrPtr;
+
+	scrPtr = malloc(sizeof(W_Screen));
+	if (!scrPtr)
+		return NULL;
+
+        memset(scrPtr, 0, sizeof(W_Screen));
+        scrPtr->rcontext = RCreateContext(display, DefaultScreen(display), NULL);
+        scrPtr->display = display;
+        scrPtr->screen = DefaultScreen(display);
+        scrPtr->fontCache = WMCreateHashTable(WMStringPointerHashCallbacks);
+        scrPtr->visual = scrPtr->rcontext->visual;
+        scrPtr->colormap = scrPtr->rcontext->cmap;
+        scrPtr->xftdraw = XftDrawCreate(scrPtr->display,
+               W_DRAWABLE(scrPtr), scrPtr->visual, scrPtr->colormap);
+
+	return scrPtr;
+}
+
+void WMDestroyFontScreen(WMScreen *screen)
+{
+}
+
 void WMSetWidgetDefaultFont(WMScreen * scr, WMFont * font)
 {
 	WMReleaseFont(scr->normalFont);

@@ -37,6 +37,7 @@
 #include <libxfce4util/libxfce4util.h>
 
 #include <common/xfwm-common.h>
+#include <WINGs/WINGs.h>
 
 #include "display.h"
 #include "screen.h"
@@ -263,6 +264,237 @@ static inline bool client_should_stick (XRRMonitorInfo *monitors, int monitor_co
                  == get_client_monitor(monitors, monitor_count, c)));
 }
 
+/* workspace name on switch display */
+#define WORKSPACE_NAME_FADE_DELAY 30
+#define WORKSPACE_NAME_DELAY     400
+
+void hideWorkspaceNameTimerDestory(gpointer data)
+{
+}
+
+gboolean
+hideWorkspaceName (gpointer user_data)
+{
+    ScreenInfo *scr = user_data;
+    Display *dpy = myScreenGetXDisplay (scr);
+    RContext *rcontext;
+
+    if (!scr->workspace_name_data || scr->workspace_name_data->count == 0
+        || time(NULL) > scr->workspace_name_data->timeout)
+    {
+        XUnmapWindow(dpy, scr->workspace_name);
+
+        if (scr->workspace_name_data)
+        {
+            RReleaseImage(scr->workspace_name_data->back);
+            RReleaseImage(scr->workspace_name_data->text);
+            wfree(scr->workspace_name_data);
+
+            scr->workspace_name_data = NULL;
+        }
+        scr->workspace_timer = false;
+
+        return false;
+    }
+
+    RImage *img = RCloneImage(scr->workspace_name_data->back);
+    Pixmap pix;
+
+    rcontext = WMScreenRContext(scr->workspace_name_screen);
+    RCombineImagesWithOpaqueness(img, scr->workspace_name_data->text,
+                                 scr->workspace_name_data->count * 255 / 10);
+
+    RConvertImage(rcontext, img, &pix);
+
+    RReleaseImage(img);
+
+    XSetWindowBackgroundPixmap(dpy, scr->workspace_name, pix);
+    XClearWindow(dpy, scr->workspace_name);
+    XFreePixmap(dpy, pix);
+    XFlush(dpy);
+
+    scr->workspace_name_data->count--;
+    return true;
+}
+
+void
+showWorkspaceName (ScreenInfo *scr, gint new_ws)
+{
+    WorkspaceNameData *data;
+    Display *dpy = myScreenGetXDisplay (scr);
+    Pixmap text, mask;
+    RXImage *ximg;
+    RContext *rcontext;
+    WMScreen *screen;
+    const char *workspace_name = scr->workspace_names[new_ws];
+    int len = strlen(workspace_name);
+    int monitor_count = 0;
+    int px, py;
+    int w, h, x, y;
+
+    XFlush(dpy);
+
+    if (scr->workspace_name_screen) {
+        screen = scr->workspace_name_screen;
+    } else {
+        screen = WMCreateFontScreen (dpy);
+        scr->workspace_name_screen = screen;
+    }
+
+    rcontext = WMScreenRContext(screen);
+
+    if (!scr->workspace_name_font) {
+        char *workspace_name_font = "monospace";
+        scr->workspace_name_font = WMCreateFont(screen, workspace_name_font);
+    }
+
+    if (scr->workspace_name_data) {
+        RReleaseImage(scr->workspace_name_data->back);
+        RReleaseImage(scr->workspace_name_data->text);
+        wfree(scr->workspace_name_data);
+        scr->workspace_name_data = NULL;
+    }
+
+    if (!scr->workspace_timer) {
+        g_timeout_add_full(G_PRIORITY_DEFAULT,
+                           WORKSPACE_NAME_FADE_DELAY,
+                           hideWorkspaceName,
+                           scr,
+                           hideWorkspaceNameTimerDestory);
+        scr->workspace_timer = true;
+    }
+
+    if (!scr->workspace_name) {
+        int vmask = CWBackPixel |
+            CWSaveUnder | CWOverrideRedirect | CWColormap | CWBorderPixel;
+        XSetWindowAttributes attribs;
+
+        attribs.event_mask = KeyPressMask | FocusChangeMask;
+        attribs.override_redirect = True;
+        attribs.save_under = True;
+        attribs.override_redirect = True;
+        attribs.colormap = scr->cmap;
+        attribs.background_pixel = 0; // scr->icon_back_texture->normal.pixel;
+        attribs.border_pixel = 0;	/* do not care */
+
+        scr->workspace_name =
+            XCreateWindow(dpy, scr->xroot, 0, 0, 10, 10, 0, scr->depth,
+                          CopyFromParent, scr->visual, vmask, &attribs);
+    }
+
+    data = wmalloc(sizeof(WorkspaceNameData));
+    data->back = NULL;
+
+    w = WMWidthOfString(scr->workspace_name_font, workspace_name, len);
+    h = WMFontHeight(scr->workspace_name_font);
+
+    XRRMonitorInfo *monitors;
+
+    px = (scr->width - (w + 4)) / 2;
+    py = (scr->height - (h + 4)) / 2;
+
+    monitors = XRRGetMonitors(dpy, scr->workspace_name, True, &monitor_count);
+    if (monitors != NULL) {
+        int i;
+
+        for (i = 0; i < monitor_count; i++) {
+            XRRMonitorInfo *monitor = &monitors[i];
+            if (monitor->primary) {
+                px = monitor->x + (monitor->width - (w + 4)) / 2;
+                py = monitor->y + (monitor->height - (h + 4)) / 2;
+                break;
+            }
+        }
+
+        XRRFreeMonitors (monitors);
+    }
+
+    XResizeWindow(dpy, scr->workspace_name, w + 4, h + 4);
+    XMoveWindow(dpy, scr->workspace_name, px, py);
+
+    text = XCreatePixmap(dpy, rcontext->drawable, w + 4, h + 4, rcontext->depth);
+    mask = XCreatePixmap(dpy, rcontext->drawable, w + 4, h + 4, 1);
+
+    /*XSetForeground(dpy, scr->box_gc, 0);
+      XFillRectangle(dpy, mask, scr->box_gc, 0, 0, w+4, h+4); */
+
+    XFillRectangle(dpy, text, WMColorGC(WMBlackColor(screen)), 0, 0, w + 4, h + 4);
+
+    for (x = 0; x <= 4; x++)
+        for (y = 0; y <= 4; y++)
+            WMDrawString(screen, text, WMWhiteColor(screen), scr->workspace_name_font, x, y, workspace_name, len);
+
+    XSetForeground(dpy, scr->box_gc, 1);
+    XSetBackground(dpy, scr->box_gc, 0);
+
+    XCopyPlane(dpy, text, mask, scr->box_gc, 0, 0, w + 4, h + 4, 0, 0, 1 << (rcontext->depth - 1));
+
+    /*XSetForeground(dpy, scr->box_gc, 1); */
+    XSetBackground(dpy, scr->box_gc, 1);
+
+    XFillRectangle(dpy, text, WMColorGC(WMBlackColor(screen)), 0, 0, w + 4, h + 4);
+
+    WMDrawString(screen, text, WMWhiteColor(screen), scr->workspace_name_font, 2, 2, workspace_name, len);
+
+#ifdef USE_XSHAPE
+    if (w_global.xext.shape.supported)
+        XShapeCombineMask(dpy, scr->workspace_name, ShapeBounding, 0, 0, mask, ShapeSet);
+#endif
+
+    XSetWindowBackgroundPixmap(dpy, scr->workspace_name, text);
+    XClearWindow(dpy, scr->workspace_name);
+
+    data->text = RCreateImageFromDrawable(rcontext, text, None);
+
+    XFreePixmap(dpy, text);
+    XFreePixmap(dpy, mask);
+
+    if (!data->text) {
+        XMapRaised(dpy, scr->workspace_name);
+        XFlush(dpy);
+
+        goto erro;
+    }
+
+    ximg = RGetXImage(rcontext, scr->xroot, px, py, data->text->width, data->text->height);
+    if (!ximg)
+        goto erro;
+
+    XMapRaised(dpy, scr->workspace_name);
+    XFlush(dpy);
+
+    data->back = RCreateImageFromXImage(rcontext, ximg->image, NULL);
+    RDestroyXImage(rcontext, ximg);
+
+    if (!data->back) {
+        goto erro;
+    }
+
+    data->count = 10;
+
+    /* set a timeout for the effect */
+    data->timeout = time(NULL) + 2 + (WORKSPACE_NAME_DELAY + WORKSPACE_NAME_FADE_DELAY * data->count) / 1000;
+
+    scr->workspace_name_data = data;
+
+    return;
+
+erro:
+    /* if (scr->workspace_name_timer) */
+    /* 	WMDeleteTimerHandler(scr->workspace_name_timer); */
+
+    if (data->text)
+        RReleaseImage(data->text);
+    if (data->back)
+        RReleaseImage(data->back);
+    wfree(data);
+
+    scr->workspace_name_data = NULL;
+
+    /* 	scr->workspace_name_timer = WMAddTimerHandler(WORKSPACE_NAME_DELAY + */
+    /* 						      10 * WORKSPACE_NAME_FADE_DELAY, hideWorkspaceName, scr); */
+}
+
 void
 workspaceSwitch (ScreenInfo *screen_info, gint new_ws, Client * c2, gboolean update_focus, guint32 timestamp)
 {
@@ -442,6 +674,8 @@ workspaceSwitch (ScreenInfo *screen_info, gint new_ws, Client * c2, gboolean upd
     if (monitors != NULL) {
         XRRFreeMonitors (monitors);
     }
+
+    showWorkspaceName (screen_info, new_ws);
 }
 
 void

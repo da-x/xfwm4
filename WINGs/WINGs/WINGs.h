@@ -783,6 +783,7 @@ void WMSetViewDragDestinationProcs(WMView *view, WMDragDestinationProcs *procs);
 
 Bool WMIsAntialiasingEnabled(WMScreen *scrPtr);
 
+WMScreen *WMCreateFontScreen(Display *display);
 WMFont* WMCreateFont(WMScreen *scrPtr, const char *fontName);
 
 WMFont* WMCopyFontWithStyle(WMScreen *scrPtr, WMFont *font, WMFontStyle style);
