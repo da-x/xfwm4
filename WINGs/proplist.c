@@ -1791,35 +1791,6 @@ int wmkdirhier(const char *path)
 	return 1;
 }
 
-/* ARGSUSED2 */
-static int wrmdirhier_fn(const char *path, const struct stat *st,
-    int type, struct FTW *ftw)
-{
-	/* Parameter not used, but tell the compiler that it is ok */
-	(void) st;
-	(void) ftw;
-
-	switch(type) {
-	case FTW_D:
-		break;
-	case FTW_DP:
-		return rmdir(path);
-		break;
-	case FTW_F:
-	case FTW_SL:
-	case FTW_SLN:
-		return unlink(path);
-		break;
-	case FTW_DNR:
-	case FTW_NS:
-	default:
-		return EPERM;
-	}
-
-	/* NOTREACHED */
-	return 0;
-}
-
 /*
  * remove a directory hierarchy
  *
@@ -1833,21 +1804,5 @@ static int wrmdirhier_fn(const char *path, const struct stat *st,
  */
 int wrmdirhier(const char *path)
 {
-	struct stat st;
-	int error;
-	const char *t;
-
-	/* Only remove directories under $WMAKER_USER_ROOT */
-	if ((t = wusergnusteppath()) == NULL)
-		return EPERM;
-	if (strncmp(path, t, strlen(t)) != 0)
-		return EPERM;
-
-	/* Shortcut if it doesn't exist to begin with */
-	if (stat(path, &st) == -1)
-		return ENOENT;
-
-	error = nftw(path, wrmdirhier_fn, 1, FTW_PHYS);
-
-	return error;
+        return -1;
 }

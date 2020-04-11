@@ -15,6 +15,8 @@ DISTCLEANFILES =							\
 	intltool-update
 
 SUBDIRS = 								\
+        wrlib                                                           \
+        WINGs                                                           \
 	defaults 							\
 	helper-dialog 							\
 	icons 								\

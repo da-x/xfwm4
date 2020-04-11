@@ -7,15 +7,7 @@ AUTOMAKE_OPTIONS =
 
 EXTRA_DIST = tests
 
-lib_LTLIBRARIES = libwraster.la
-
-libwraster_la_LDFLAGS = -version-info @WRASTER_VERSION@
-
-if HAVE_LD_VERSION_SCRIPT
-libwraster_la_LDFLAGS += -Wl,--version-script=libwraster.map
-EXTRA_libwraster_la_DEPENDENCIES = libwraster.map
-CLEANFILES = libwraster.map
-endif
+noinst_LTLIBRARIES = libwraster.la
 
 include_HEADERS = wraster.h
 
@@ -79,20 +71,7 @@ AM_CPPFLAGS = $(DFLAGS) @HEADER_SEARCH_PATH@
 
 libwraster_la_LIBADD = @LIBRARY_SEARCH_PATH@ @GFXLIBS@ @MAGICKLIBS@ @XLIBS@ @LIBXMU@ -lm
 
-pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = wrlib.pc
-
 DISTCLEANFILES = $(pkgconfig_DATA)
-
-wrlib.pc: Makefile
-	@echo "Generating $@"
-	@echo 'Name: wrlib' > $@
-	@echo 'Description: Image manipulation and conversion library' >> $@
-	@echo 'Version: $(VERSION)' >> $@
-	@echo 'Libs: $(lib_search_path) -lwraster' >> $@
-	@echo 'Libs.private: $(GFXLIBS) $(MAGICKLIBS) $(XLIBS) -lm' >> $@
-	@echo 'Cflags: $(inc_search_path)' >> $@
-
 
 if HAVE_LD_VERSION_SCRIPT
 libwraster.map: $(include_HEADERS) $(top_srcdir)/script/generate-mapfile-from-header.sh
